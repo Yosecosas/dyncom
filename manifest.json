@@ -1,0 +1,21 @@
+{
+  "id": "./",
+  "name": "Dynamic Combat",
+  "short_name": "Dynamic Combat",
+  "description": "Combate 1 contra 1: golpe, bloqueo y agarre.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#101b20",
+  "theme_color": "#101b20",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
