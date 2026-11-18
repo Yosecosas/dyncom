@@ -2,8 +2,17 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Dynamic Combat</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#101b20">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dynamic Combat">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="icon" type="image/png" href="icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -16,10 +25,12 @@ LAYOUT: HUD de juego de lucha arriba, triángulo de reglas abajo a la izquierda,
 */
 :root{--ink:#f3ede4;--p1:#e2553f;--p2:#3fb4c2;--gold:#ffcf5a;--panel:rgba(14,18,20,.82)}
 *{box-sizing:border-box;min-width:0}
-html,body{margin:0;height:100%;background:#101b20;color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
-#game{position:fixed;inset:0}
-canvas{display:block;width:100%;height:100%;outline:none}
-.hud{position:absolute;inset:0 0 auto 0;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:clamp(10px,2.4vw,28px);padding:clamp(12px,2.4vw,26px) clamp(14px,3vw,40px);pointer-events:none;align-items:start;transition:opacity .3s}
+/* pantalla completa en móvil: sin scroll, sin rebote, sin zoom ni menús de pulsación larga */
+html,body{margin:0;width:100%;height:100%;background:#101b20;color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;overflow:hidden;overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-text-size-adjust:100%}
+body{position:fixed;inset:0}
+#game{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;overflow:hidden}
+canvas{display:block;width:100%;height:100%;outline:none;touch-action:none}
+.hud{position:absolute;inset:0 0 auto 0;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:clamp(10px,2.4vw,28px);padding:max(clamp(10px,2.4vw,26px),env(safe-area-inset-top)) max(clamp(14px,3vw,40px),env(safe-area-inset-right)) 0 max(clamp(14px,3vw,40px),env(safe-area-inset-left));pointer-events:none;align-items:start;transition:opacity .3s}
 .hud.off,.tri.off,.keys.off{opacity:0}
 .name{font:700 clamp(16px,1.7vw,21px)/1 Oswald,sans-serif;margin:0 0 7px;display:flex;gap:10px;align-items:baseline}
 .p2 .name{justify-content:flex-end}
@@ -54,7 +65,7 @@ canvas{display:block;width:100%;height:100%;outline:none}
 .tri p{margin:4px 0 0;font-size:13px;opacity:.7;line-height:1.3}
 .keys{position:absolute;right:clamp(10px,2.4vw,28px);bottom:clamp(10px,2.4vw,28px);font-size:13px;line-height:1.7;text-align:right;opacity:.82;pointer-events:none;transition:opacity .3s}
 kbd{font:600 12px Inter,sans-serif;padding:2px 6px;border-radius:4px;background:rgba(243,237,228,.12);box-shadow:inset 0 -2px 0 rgba(0,0,0,.35);white-space:nowrap}
-.ov{position:absolute;inset:0;display:grid;align-items:center;justify-items:start;padding:clamp(16px,5vw,72px);background:linear-gradient(90deg,rgba(9,13,15,.92) 0%,rgba(9,13,15,.6) 45%,rgba(9,13,15,0) 75%);overflow:auto}
+.ov{position:absolute;inset:0;display:grid;align-items:center;justify-items:start;padding:clamp(16px,5vw,72px);background:linear-gradient(90deg,rgba(9,13,15,.92) 0%,rgba(9,13,15,.6) 45%,rgba(9,13,15,0) 75%);overflow:auto;touch-action:pan-y;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .ov[hidden]{display:none}
 .ov.mid{justify-items:center;background:rgba(9,13,15,.62)}
 .card{width:min(520px,100%)}
@@ -78,16 +89,28 @@ button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .rules ul{margin:0;padding:0;list-style:none}
 .rules li{margin:0 0 4px}
 .ver{margin-top:22px;font-size:13px;opacity:.5}
-#touch{display:none;position:absolute;inset:auto 0 0 0;padding:12px max(12px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) 12px;justify-content:space-between;align-items:end;pointer-events:none}
-.touch #touch{display:flex}
+/* controles táctiles: joystick flotante a la izquierda, acciones a la derecha */
+#touch{display:none;position:absolute;inset:0;pointer-events:none;touch-action:none}
+.touch.playing #touch{display:block}
 .touch .keys,.touch .tri{display:none}
-.pad{display:grid;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(2,58px);gap:6px;pointer-events:auto}
-.pad button,.acts button{padding:0;min-height:0;font-size:22px;background:rgba(14,18,20,.55);touch-action:none}
-.pad [data-k=up]{grid-column:2;grid-row:1}.pad [data-k=left]{grid-column:1;grid-row:2}.pad [data-k=down]{grid-column:2;grid-row:2}.pad [data-k=right]{grid-column:3;grid-row:2}
-.acts{display:grid;grid-template-columns:repeat(3,64px);gap:8px;pointer-events:auto}
-.acts button{height:64px;border-radius:50%;font:700 14px Oswald,sans-serif}
-.acts [data-k=strike]{border-color:var(--p1)}
-.acts [data-k=grab]{border-color:var(--gold)}
+#zone{position:absolute;left:0;bottom:0;width:46%;height:72%;pointer-events:auto;touch-action:none}
+#stick{position:absolute;left:calc(max(24px,env(safe-area-inset-left)) + 70px);bottom:auto;top:calc(100% - max(18px,env(safe-area-inset-bottom)) - 70px);width:140px;height:140px;margin:-70px 0 0 -70px;border-radius:50%;background:rgba(14,18,20,.35);box-shadow:inset 0 0 0 2px rgba(243,237,228,.28);opacity:.55;transition:opacity .15s;pointer-events:none}
+#stick.on{opacity:1}
+#knob{position:absolute;left:50%;top:50%;width:62px;height:62px;margin:-31px 0 0 -31px;border-radius:50%;background:rgba(243,237,228,.85);box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.acts{position:absolute;right:max(16px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));display:grid;grid-template-columns:62px 62px 78px;grid-template-rows:repeat(2,62px);gap:10px;pointer-events:auto;touch-action:none}
+.acts button{padding:0;min-height:0;width:62px;height:62px;border-radius:50%;font:700 13px Oswald,sans-serif;background:rgba(14,18,20,.6);touch-action:none;-webkit-user-select:none;user-select:none}
+.acts button.on{background:rgba(243,237,228,.9);color:#141010;transform:scale(.94)}
+.acts [data-k=strike]{grid-column:3;grid-row:1/3;align-self:center;width:76px;height:76px;justify-self:center;border-color:var(--p1);font-size:15px}
+.acts [data-k=grab]{grid-column:2;grid-row:1;border-color:var(--gold)}
+.acts [data-k=kick]{grid-column:2;grid-row:2}
+.acts [data-k=block]{grid-column:1;grid-row:2}
+.acts [data-k=dodge]{grid-column:1;grid-row:1}
+#tpause{display:none;position:absolute;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 76px);transform:translateX(-50%);min-height:40px;width:44px;padding:0;font:700 15px Oswald,sans-serif;background:rgba(14,18,20,.55);touch-action:manipulation}
+.touch.playing #tpause{display:block}
+#rotate{display:none;position:fixed;inset:0;z-index:50;place-items:center;text-align:center;padding:24px;background:#101b20;font:700 26px/1.2 Oswald,sans-serif}
+#rotate small{display:block;margin-top:10px;font:400 15px Inter,sans-serif;opacity:.7}
+@media (orientation:portrait){.touch #rotate{display:grid}}
+@media (max-height:520px){.tp{top:calc(max(8px,env(safe-area-inset-top)) + 64px);padding:8px 10px}.tp .st,.tp .tp-f{display:none}.tp .lbl{margin:6px 0 4px}.ov{align-items:start}}
 .pause-btn{position:absolute;top:auto;bottom:auto}
 .alt{background:transparent;border-color:var(--ink)}
 button:disabled{opacity:.45;cursor:wait}
@@ -168,9 +191,12 @@ button:disabled{opacity:.45;cursor:wait}
  </div>
 
  <div id="touch" aria-hidden="true">
-  <div class="pad"><button data-k="up">▲</button><button data-k="left">◀</button><button data-k="down">▼</button><button data-k="right">▶</button></div>
-  <div class="acts"><button data-k="block">Bloqueo</button><button data-k="strike">Golpe</button><button data-k="grab">Agarre</button><button data-k="kick">Patada</button><button data-k="dodge">Esquiva</button></div>
+  <div id="zone"></div>
+  <div id="stick"><div id="knob"></div></div>
+  <div class="acts"><button data-k="dodge">Esquiva</button><button data-k="grab">Agarre</button><button data-k="strike">Golpe</button><button data-k="block">Bloqueo</button><button data-k="kick">Patada</button></div>
  </div>
+ <button id="tpause" aria-label="Pausa">II</button>
+ <div id="rotate">Gira el móvil<small>Dynamic Combat se juega en horizontal.</small></div>
 
  <div class="ov" id="menu">
   <div class="card">
@@ -942,16 +968,49 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>keys.delete(e.code));
 // ratón: clic izquierdo golpe, clic derecho agarre
 const playing=()=>G.state==='fight'||G.state==='intro';
-canvas.addEventListener('mousedown',e=>{if(!playing()||G.paused)return;e.preventDefault();canvas.focus();if(e.button===0)P[0].press='strike';else if(e.button===2)P[0].press='grab'});
+let lastTouch=-1e9; // los navegadores móviles simulan un clic tras cada toque: se ignora
+const fromTouch=()=>performance.now()-lastTouch<800;
+canvas.addEventListener('mousedown',e=>{if(!playing()||G.paused||fromTouch())return;e.preventDefault();canvas.focus();if(e.button===0)P[0].press='strike';else if(e.button===2)P[0].press='grab'});
 addEventListener('contextmenu',e=>{if(playing())e.preventDefault()});
 addEventListener('blur',()=>keys.clear());
 const any=a=>a.some(k=>keys.has(k));
 // táctil
-const touch={up:0,down:0,left:0,right:0,block:0};
-if(window.matchMedia&&matchMedia('(pointer:coarse)').matches)document.body.classList.add('touch');
-document.querySelectorAll('#touch button').forEach(b=>{const k=b.dataset.k;
- b.addEventListener('pointerdown',e=>{e.preventDefault();audioInit();if(['strike','grab','kick','dodge'].includes(k))P[0].press=k;else touch[k]=1});
- for(const ev of['pointerup','pointercancel','pointerleave'])b.addEventListener(ev,()=>{if(k in touch)touch[k]=0})});
+/* ---------- Táctil: joystick analógico + botones, con eventos touch* (multitáctil) ---------- */
+const touch={jx:0,jy:0,block:0};
+const isTouch=(window.matchMedia&&matchMedia('(pointer:coarse)').matches)||'ontouchstart' in window||navigator.maxTouchPoints>0;
+if(isTouch)document.body.classList.add('touch');
+const NP={passive:false};
+{
+ const zone=$('#zone'),stick=$('#stick'),knob=$('#knob'),R=56,DZ=.18;let sid=null,cx=0,cy=0;
+ const home=()=>{stick.style.left='';stick.style.top='';knob.style.transform='';stick.classList.remove('on')};
+ const move=t=>{let dx=t.clientX-cx,dy=t.clientY-cy;const d=Math.hypot(dx,dy);if(d>R){dx*=R/d;dy*=R/d}
+  knob.style.transform=`translate(${dx}px,${dy}px)`;let x=dx/R,y=-dy/R;if(Math.hypot(x,y)<DZ)x=y=0;touch.jx=x;touch.jy=y};
+ zone.addEventListener('touchstart',e=>{e.preventDefault();lastTouch=performance.now();audioInit();if(sid!==null)return;
+  const t=e.changedTouches[0],r=game.getBoundingClientRect();sid=t.identifier;cx=t.clientX;cy=t.clientY;
+  stick.style.left=(cx-r.left)+'px';stick.style.top=(cy-r.top)+'px';stick.classList.add('on');move(t)},NP);
+ zone.addEventListener('touchmove',e=>{e.preventDefault();for(const t of e.changedTouches)if(t.identifier===sid)move(t)},NP);
+ const end=e=>{for(const t of e.changedTouches)if(t.identifier===sid){sid=null;touch.jx=touch.jy=0;home()}};
+ zone.addEventListener('touchend',end,NP);zone.addEventListener('touchcancel',end,NP);
+ // botones: cada uno sigue su propio dedo, así se puede andar y pegar a la vez
+ document.querySelectorAll('#touch .acts button').forEach(b=>{const k=b.dataset.k;
+  const down=e=>{e.preventDefault();b.classList.add('on');audioInit();if(k==='block')touch.block=1;else if(playing()&&!G.paused)P[0].press=k};
+  const up=e=>{e.preventDefault();b.classList.remove('on');if(k==='block')touch.block=0};
+  b.addEventListener('touchstart',e=>{lastTouch=performance.now();down(e)},NP);
+  b.addEventListener('touchend',up,NP);b.addEventListener('touchcancel',up,NP);
+  b.addEventListener('mousedown',e=>{if(!fromTouch())down(e)});b.addEventListener('mouseup',e=>{if(!fromTouch())up(e)});
+  b.addEventListener('mouseleave',()=>{b.classList.remove('on');if(k==='block')touch.block=0});
+ });
+ // tocar el escenario no hace nada (evita zoom y clics simulados)
+ canvas.addEventListener('touchstart',e=>{lastTouch=performance.now();if(playing())e.preventDefault()},NP);
+ document.addEventListener('gesturestart',e=>e.preventDefault());
+ document.addEventListener('dblclick',e=>{if(playing())e.preventDefault()});
+ $('#tpause').addEventListener('click',()=>togglePause());
+ addEventListener('blur',()=>{touch.jx=touch.jy=0;touch.block=0;home()});
+}
+// en el navegador del móvil: pantalla completa y bloqueo en horizontal al empezar (en la app instalada lo hace el manifest)
+function goFull(){if(!isTouch)return;try{const st=matchMedia('(display-mode: standalone)').matches,d=document.documentElement;
+ const lock=()=>{try{const o=screen.orientation;o&&o.lock&&o.lock('landscape').catch(()=>{})}catch(e){}};
+ if(!st&&d.requestFullscreen&&!document.fullscreenElement)d.requestFullscreen({navigationUI:'hide'}).then(lock,()=>{});else lock()}catch(e){}}
 // mando
 const padPrev=[[],[]];
 const camR=new V(),camF=new V();
@@ -960,7 +1019,7 @@ function readInputs(){
  camera.getWorldDirection(camF);camF.y=0;camF.normalize();camR.set(-camF.z,0,camF.x);
  const S=[{sx:0,sy:0,blk:false},{sx:0,sy:0,blk:false}];
  for(const m of MAPS[G.mode]){const s=S[m.p];if(any(m.left))s.sx-=1;if(any(m.right))s.sx+=1;if(any(m.up))s.sy+=1;if(any(m.down))s.sy-=1;if(any(m.block))s.blk=true}
- S[0].sx+=touch.right-touch.left;S[0].sy+=touch.up-touch.down;if(touch.block)S[0].blk=true;
+ S[0].sx+=touch.jx;S[0].sy+=touch.jy;if(touch.block)S[0].blk=true;
  const pads=navigator.getGamepads?[...navigator.getGamepads()].filter(Boolean):[];
  pads.forEach((gp,i)=>{const pi=G.mode==='cpu'?0:i;if(pi>1||(G.mode==='cpu'&&i>0))return;const s=S[pi],b=gp.buttons.map(x=>x.pressed);
   let ax0=gp.axes[0]||0,ax1=gp.axes[1]||0;if(Math.hypot(ax0,ax1)>.25){s.sx+=ax0;s.sy-=ax1}
@@ -997,7 +1056,7 @@ function aiThink(f,o,dt){
 
 /* ---------- Flujo de partida ---------- */
 const hud={h:[$('#h1'),$('#h2')],t:[$('#t1'),$('#t2')],w:[$('#w1'),$('#w2')],clock:$('#clock'),rnd:$('#rnd')};
-function showHud(on){for(const id of['#hud','#tri','#keys'])$(id).classList.toggle('off',!on)}
+function showHud(on){document.body.classList.toggle('playing',on);for(const id of['#hud','#tri','#keys'])$(id).classList.toggle('off',!on)}
 function pips(){for(let i=0;i<2;i++)[...hud.w[i].children].forEach((b,k)=>b.classList.toggle('on',k<G.wins[i]))}
 function resetRound(){P[0].reset(-1.6);P[1].reset(1.6);Object.assign(ai,{t:.5,hold:0,retreat:0});G.timer=60;G.state='intro';G.introT=0;G.slow=1;hud.rnd.textContent='Ronda '+G.round;msg('Ronda '+G.round);pips()}
 function startMatch(){leaveTraining();audioInit();if(ax&&ax.state==='suspended')ax.resume();G.wins=[0,0];G.round=1;$('#menu').hidden=true;$('#end').hidden=true;$('#pause').hidden=true;G.paused=false;showHud(true);
@@ -1019,7 +1078,7 @@ function keyLegend(){
 }
 const seg=(id,cb)=>document.querySelectorAll(id+' button').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll(id+' button').forEach(x=>x.setAttribute('aria-pressed',x===b));cb(b.dataset.v)}));
 seg('#diff',v=>G.diff=+v);
-$('#start').onclick=startMatch;$('#again').onclick=startMatch;
+$('#start').onclick=()=>{goFull();startMatch()};$('#again').onclick=startMatch;
 $('#resume').onclick=togglePause;$('#toMenu1').onclick=toMenu;$('#toMenu2').onclick=toMenu;
 keyLegend();
 
@@ -1076,7 +1135,7 @@ function startTraining(){
 }
 function leaveTraining(){G.train=false;$('#tp').hidden=true;bag.g.visible=false;P[1].m.root.visible=true;document.querySelectorAll('.pips').forEach(e=>e.style.visibility='');$('#nm2').textContent='Darío'}
 document.querySelectorAll('#dummy button').forEach(b=>b.addEventListener('click',()=>{setDummy(b.dataset.v);b.blur();canvas.focus()}));
-$('#train').onclick=startTraining;
+$('#train').onclick=()=>{goFull();startTraining()};
 
 /* ---------- Cámara ---------- */
 const look=new V(0,1,0),camT=new V();
@@ -1121,5 +1180,7 @@ function frame(now){
 requestAnimationFrame(frame);
 }
 </script>
+<!-- PWA: registra el Service Worker -->
+<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>
 </html>
